@@ -28,33 +28,41 @@
 # See COPYRIGHT and LICENSE files for more details.
 #++
 
-module WorkPackageTypes
-  class SettingsTabController < BaseTabController
-    layout "admin"
+require "spec_helper"
 
-    current_menu_item %i[edit update] do
-      :types
+RSpec.describe Projects::Settings::WorkPackages::TypesController do
+  shared_let(:user) { create(:admin) }
+
+  current_user { user }
+
+  describe "PATCH #update" do
+    let(:type) { create(:type_bug) }
+    let(:other_type) { create(:type_task) }
+    let(:project) { create(:project, types: [type, other_type]) }
+    let!(:work_package) { create(:work_package, project:, type:) }
+
+    before do
+      patch :update,
+            params: {
+              project_id: project.identifier,
+              project: { type_ids: [other_type.id.to_s] }
+            }
     end
 
-    def edit; end
+    it { expect(response).to redirect_to(project_settings_types_path(project.identifier)) }
 
-    def update
-      result = UpdateService.new(user: current_user, model: @type, contract_class: UpdateSettingsContract)
-                            .call(permitted_settings_params)
-
-      if result.success?
-        redirect_to edit_type_settings_path(type_id: @type.id), notice: I18n.t(:notice_successful_update)
-      else
-        render :edit, status: :unprocessable_entity
-      end
+    it "shows an error message with a link to the affected work packages" do
+      expect(sanitize_string(flash[:error]))
+        .to include("Unable to deactivate type #{type.name} because it's still in use by work packages")
+      expect(flash[:error].first)
+        .to include(work_packages_path(query_props: { f: [
+          { n: "type", o: "=", v: [type.id] },
+          { n: "project", o: "=", v: [project.id.to_s] }
+        ] }.to_json))
     end
 
-    private
-
-    def permitted_settings_params
-      permitted = params.expect(type: %i[name parent_id color_id description is_milestone is_in_roadmap is_default])
-      permitted = permitted.except(:parent_id) unless OpenProject::FeatureDecisions.subtypes_active?
-      permitted
+    it "keeps the type active in the project" do
+      expect(project.reload.types).to include(type)
     end
   end
 end
