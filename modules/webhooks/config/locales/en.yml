@@ -36,6 +36,7 @@ en:
       events:
         created: "Created"
         updated: "Updated"
+        deleted: "Deleted"
         comment: "Comment"
         internal_comment: "Internal comment"
       explanation_html: >

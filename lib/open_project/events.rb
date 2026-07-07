@@ -56,6 +56,8 @@ module OpenProject
     OAUTH_CLIENT_TOKEN_CREATED = "oauth_client_token_created"
 
     TIME_ENTRY_CREATED = "time_entry_created"
+    TIME_ENTRY_UPDATED = "time_entry_updated"
+    TIME_ENTRY_DESTROYED = "time_entry_destroyed"
 
     NEWS_COMMENT_CREATED = "news_comment_created"
 
@@ -84,5 +86,6 @@ module OpenProject
     MODULE_DISABLED = "module_disabled"
 
     WORK_PACKAGE_SHARED = "work_package_shared"
+    WORK_PACKAGE_DESTROYED = "work_package_destroyed"
   end
 end

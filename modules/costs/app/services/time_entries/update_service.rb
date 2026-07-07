@@ -26,4 +26,15 @@
 # See COPYRIGHT and LICENSE files for more details.
 #++
 
-class TimeEntries::UpdateService < BaseServices::Update; end
+class TimeEntries::UpdateService < BaseServices::Update
+  protected
+
+  def after_perform(call)
+    OpenProject::Notifications.send(
+      OpenProject::Events::TIME_ENTRY_UPDATED,
+      time_entry: call.result
+    )
+
+    call
+  end
+end
