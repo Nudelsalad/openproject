@@ -11,7 +11,10 @@ module OpenProject::Webhooks
       # Return a complete mapping of all resource modules
       # in the form { label => { event1: label , event2: label } }
       def available_events_map
-        resource_modules.to_h { |m| [m.resource_name, m.available_events_map] }
+        resource_modules.each_with_object({}) do |mod, map|
+          map[mod.resource_name] ||= {}
+          map[mod.resource_name].merge!(mod.available_events_map)
+        end
       end
 
       ##
@@ -33,7 +36,7 @@ module OpenProject::Webhooks
       end
 
       def resources
-        %i(project work_package work_package_comment time_entry attachment)
+        %i(project work_package work_package_deleted work_package_comment time_entry attachment)
       end
     end
   end

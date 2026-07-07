@@ -26,4 +26,15 @@
 # See COPYRIGHT and LICENSE files for more details.
 #++
 
-class TimeEntries::DeleteService < BaseServices::Delete; end
+class TimeEntries::DeleteService < BaseServices::Delete
+  protected
+
+  def after_perform(call)
+    OpenProject::Notifications.send(
+      OpenProject::Events::TIME_ENTRY_DESTROYED,
+      time_entry: call.result
+    )
+
+    call
+  end
+end

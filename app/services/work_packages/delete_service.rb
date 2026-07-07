@@ -45,14 +45,24 @@ class WorkPackages::DeleteService < BaseServices::Delete
       destroy_descendants(descendants, result)
       update_ancestors_and_successors(successors, result)
       delete_associated_notifications(model)
+      send_destroyed_notification(model)
     end
 
     result
   end
 
+  def send_destroyed_notification(work_package)
+    OpenProject::Notifications.send(
+      OpenProject::Events::WORK_PACKAGE_DESTROYED,
+      work_package:,
+      actor: user
+    )
+  end
+
   def destroy_descendants(descendants, result)
     descendants.each do |descendant|
       success = destroy(descendant.reload)
+      send_destroyed_notification(descendant) if success
       result.add_dependent!(ServiceResult.new(success:, result: descendant))
     end
   end

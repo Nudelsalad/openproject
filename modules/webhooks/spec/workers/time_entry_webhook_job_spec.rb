@@ -131,6 +131,12 @@ RSpec.describe TimeEntryWebhookJob, :webmock, type: :job do
     end
   end
 
+  describe "triggering a time entry update" do
+    it_behaves_like "a time entry webhook call" do
+      let(:event) { "time_entry:updated" }
+    end
+  end
+
   describe "triggering a work package create with an invalid url" do
     it_behaves_like "a time entry webhook call" do
       let(:event) { "time_entry:create" }
