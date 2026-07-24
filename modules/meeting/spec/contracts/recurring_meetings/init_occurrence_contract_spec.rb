@@ -28,20 +28,35 @@
 # See COPYRIGHT and LICENSE files for more details.
 #++
 
-module Projects::Copy
-  class VersionsDependentService < Dependency
-    def self.human_name
-      I18n.t(:label_version_plural)
+require "spec_helper"
+require "contracts/shared/model_contract_shared_context"
+
+RSpec.describe RecurringMeetings::InitOccurrenceContract do
+  include_context "ModelContract shared context"
+
+  shared_let(:project) { create(:project, enabled_module_names: %i[meetings]) }
+  let(:recurring_meeting) { create(:recurring_meeting, project:) }
+  let(:contract) { described_class.new(recurring_meeting, user) }
+
+  context "with create_meetings permission" do
+    let(:user) do
+      create(:user, member_with_permissions: { project => %i[view_meetings create_meetings] })
     end
 
-    def source_count
-      source.versions.count
+    it_behaves_like "contract is valid"
+  end
+
+  context "with only view_meetings permission" do
+    let(:user) do
+      create(:user, member_with_permissions: { project => %i[view_meetings] })
     end
 
-    protected
+    it_behaves_like "contract is invalid", base: :error_unauthorized
+  end
 
-    def copy_dependency(*)
-      state.version_id_lookup = copy_collection_with_id_map(:versions)
-    end
+  context "without permission" do
+    let(:user) { build_stubbed(:user) }
+
+    it_behaves_like "contract is invalid", base: :error_unauthorized
   end
 end

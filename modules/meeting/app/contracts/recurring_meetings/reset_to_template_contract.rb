@@ -28,20 +28,20 @@
 # See COPYRIGHT and LICENSE files for more details.
 #++
 
-module Projects::Copy
-  class VersionsDependentService < Dependency
-    def self.human_name
-      I18n.t(:label_version_plural)
-    end
+module RecurringMeetings
+  class ResetToTemplateContract < Meetings::BaseContract
+    validate :user_allowed_to_reset
 
-    def source_count
-      source.versions.count
-    end
+    private
 
-    protected
+    def user_allowed_to_reset
+      project = model.recurring_meeting&.project || model.project
+      return if project.nil?
 
-    def copy_dependency(*)
-      state.version_id_lookup = copy_collection_with_id_map(:versions)
+      permission = options[:reopening] ? :create_meetings : :edit_meetings
+      return if user.allowed_in_project?(permission, project)
+
+      errors.add :base, :error_unauthorized
     end
   end
 end
