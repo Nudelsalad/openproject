@@ -87,10 +87,35 @@ RSpec.describe Webhooks::Outgoing::RequestWebhookService, :webmock, type: :model
         stub_request(:post, webhook.url).to_timeout
       end
 
-      it "re-raises the timeout error while still creating a log entry" do
-        expect { subject }.to raise_error(Net::OpenTimeout)
+      it "raises a retryable delivery error while still creating a log entry" do
+        expect { subject }.to raise_error(described_class::TransientRequestError)
 
         expect(Webhooks::Log.count).to eq(1)
+      end
+    end
+
+    context "when the endpoint temporarily rejects the request" do
+      before do
+        stub_request(:post, webhook.url)
+          .to_return(status: 503, body: "Please retry")
+      end
+
+      it "raises a retryable delivery error after logging the response" do
+        expect { subject }.to raise_error(described_class::TransientRequestError, /HTTP 503/)
+
+        expect(Webhooks::Log.last.response_code).to eq(503)
+      end
+    end
+
+    context "when the endpoint rejects the request permanently" do
+      before do
+        stub_request(:post, webhook.url)
+          .to_return(status: 400, body: "Bad request")
+      end
+
+      it "logs the response without scheduling a retry" do
+        expect { subject }.to change(Webhooks::Log, :count).by(1)
+        expect(Webhooks::Log.last.response_code).to eq(400)
       end
     end
 

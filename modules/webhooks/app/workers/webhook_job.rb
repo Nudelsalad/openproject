@@ -27,14 +27,25 @@
 #++
 
 class WebhookJob < ApplicationJob
+  include GoodJob::ActiveJobExtensions::Concurrency
+
   attr_reader :webhook_id, :event_name
 
-  # Retry webhook jobs three times with exponential backoff
-  # in case of timeouts
+  good_job_control_concurrency_with(
+    perform_limit: 1,
+    key: -> { "WebhookDelivery-#{arguments.first}-#{concurrency_project_id}" }
+  )
+
+  retry_on GoodJob::ActiveJobExtensions::Concurrency::ConcurrencyExceededError,
+           wait: 5.seconds,
+           attempts: :unlimited
+
+  # Delivery failures which are likely to be temporary are retried with backoff.
   retry_on Timeout::Error,
            Faraday::TimeoutError,
+           Webhooks::Outgoing::RequestWebhookService::TransientRequestError,
            wait: :polynomially_longer,
-           attempts: 3
+           attempts: 5
 
   def perform(webhook_id, event_name)
     @webhook_id = webhook_id
@@ -43,5 +54,12 @@ class WebhookJob < ApplicationJob
 
   def webhook
     @webhook ||= Webhooks::Webhook.find(webhook_id)
+  end
+
+  private
+
+  def concurrency_project_id
+    resource_or_project_id = arguments.second
+    resource_or_project_id.respond_to?(:project_id) ? resource_or_project_id.project_id : resource_or_project_id
   end
 end

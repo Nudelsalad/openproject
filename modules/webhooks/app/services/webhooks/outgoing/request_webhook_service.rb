@@ -3,6 +3,20 @@ module Webhooks
     class RequestWebhookService
       include ::OpenProjectErrorHelper
 
+      class TransientRequestError < StandardError; end
+
+      TRANSIENT_RESPONSE_CODES = [408, 425, 429, *(500..599)].freeze
+      TRANSIENT_EXCEPTIONS = [
+        Net::OpenTimeout,
+        Net::ReadTimeout,
+        SocketError,
+        EOFError,
+        Errno::ECONNREFUSED,
+        Errno::ECONNRESET,
+        Errno::EHOSTUNREACH,
+        Errno::ENETUNREACH
+      ].freeze
+
       attr_reader :current_user, :event_name, :webhook
 
       def initialize(webhook, event_name:, current_user:)
@@ -30,9 +44,10 @@ module Webhooks
 
         log!(body:, headers:, response:, exception:)
 
-        # We want to re-raise timeout exceptions so that good_job retries the request because
-        # we assume that a timeout could have been a temporary issue.
-        raise exception if exception.is_a?(Net::OpenTimeout) || exception.is_a?(Net::ReadTimeout)
+        if transient_failure?(response:, exception:)
+          detail = exception&.message || "HTTP #{response.code}"
+          raise TransientRequestError, "Temporary webhook delivery failure: #{detail}"
+        end
       end
 
       def log!(body:, headers:, response:, exception:)
@@ -63,6 +78,12 @@ module Webhooks
           &.to_hash
           &.transform_keys { |k| k.underscore.to_sym }
           &.transform_values(&:first)
+      end
+
+      def transient_failure?(response:, exception:)
+        return TRANSIENT_EXCEPTIONS.any? { |error_class| exception.is_a?(error_class) } if exception
+
+        TRANSIENT_RESPONSE_CODES.include?(response&.code&.to_i)
       end
     end
   end
